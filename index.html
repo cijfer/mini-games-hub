@@ -115,8 +115,186 @@ ul {
 }
 </style>
 </head>
-
 <body>
-<!-- Content omitted for brevity; full content is already included above -->
+
+<header>
+    <h1>Mini Games Hub</h1>
+    <p>Games • Scores • Levels</p>
+    <div class="toggle">
+        <button onclick="toggleTheme()">Dark / Light</button>
+    </div>
+</header>
+
+<div class="container">
+
+<!-- MENU -->
+<div id="menu" class="menu">
+    <div class="card">
+        <h2>Clicker Game</h2>
+        <p>Highscore: <span id="clickHigh">0</span></p>
+        <button onclick="openGame('clicker')">Spelen</button>
+    </div>
+
+    <div class="card">
+        <h2>Reactiespel</h2>
+        <p>Beste tijd: <span id="reactionBest">--</span> ms</p>
+        <button onclick="openGame('reaction')">Spelen</button>
+    </div>
+
+    <div class="card">
+        <h2>Raad het Getal</h2>
+        <p>Met levels</p>
+        <button onclick="openGame('guess')">Spelen</button>
+    </div>
+</div>
+
+<!-- CLICKER -->
+<div id="clicker" class="hidden game">
+    <h2>Clicker Game</h2>
+    <p>Level: <span id="clickLevel">1</span></p>
+    <p>Score: <span id="clickScore">0</span> | Tijd: <span id="clickTime">10</span></p>
+    <button onclick="startClicker()">Start</button>
+    <button onclick="addClick()">Klik</button>
+    <p id="clickResult"></p>
+    <h3>Leaderboard</h3>
+    <ul id="clickBoard"></ul>
+    <button onclick="back()">Menu</button>
+</div>
+
+<!-- REACTION -->
+<div id="reaction" class="hidden game">
+    <h2>Reactiespel</h2>
+    <p>Level: <span id="reactionLevel">1</span></p>
+    <button onclick="startReaction()">Start</button>
+    <div class="reaction-box" id="reactionBox">Wachten...</div>
+    <p id="reactionResult"></p>
+    <h3>Leaderboard</h3>
+    <ul id="reactionBoard"></ul>
+    <button onclick="back()">Menu</button>
+</div>
+
+<!-- GUESS -->
+<div id="guess" class="hidden game">
+    <h2>Raad het Getal</h2>
+    <p>Level: <span id="guessLevel">1</span></p>
+    <input id="guessInput" type="number">
+    <button onclick="checkGuess()">Raad</button>
+    <p id="guessResult"></p>
+    <h3>Leaderboard</h3>
+    <ul id="guessBoard"></ul>
+    <button onclick="back()">Menu</button>
+</div>
+
+</div>
+
+<script>
+/* GELUIDEN */
+const clickSound = new Audio("https://actions.google.com/sounds/v1/cartoon/pop.ogg");
+const successSound = new Audio("https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg");
+const errorSound = new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg");
+
+/* THEME */
+function toggleTheme() {
+    document.body.classList.toggle("light");
+    localStorage.setItem("theme", document.body.classList.contains("light") ? "light" : "dark");
+}
+if (localStorage.getItem("theme") === "light") document.body.classList.add("light");
+
+/* MENU */
+function openGame(id) {
+    document.getElementById("menu").classList.add("hidden");
+    document.querySelectorAll(".game").forEach(g => g.classList.add("hidden"));
+    document.getElementById(id).classList.remove("hidden");
+}
+
+function back() {
+    document.getElementById("menu").classList.remove("hidden");
+    document.querySelectorAll(".game").forEach(g => g.classList.add("hidden"));
+}
+
+/* LEADERBOARD */
+function updateBoard(key, value, element) {
+    let data = JSON.parse(localStorage.getItem(key) || "[]");
+    data.push(value);
+    data.sort((a,b)=>a-b);
+    data = data.slice(0,5);
+    localStorage.setItem(key, JSON.stringify(data));
+    element.innerHTML = data.map(v=>`<li>${v}</li>`).join("");
+}
+
+/* CLICKER */
+let clickScore=0, clickTime=10, clickLevel=1, clickInt;
+const clickHigh = document.getElementById("clickHigh");
+
+function startClicker() {
+    clickScore=0;
+    clickTime=11-clickLevel;
+    document.getElementById("clickScore").textContent=0;
+    document.getElementById("clickTime").textContent=clickTime;
+    clearInterval(clickInt);
+    clickInt=setInterval(()=>{
+        clickTime--;
+        document.getElementById("clickTime").textContent=clickTime;
+        if(clickTime===0){
+            clearInterval(clickInt);
+            successSound.play();
+            updateBoard("clickBoard", clickScore, document.getElementById("clickBoard"));
+            if(clickScore> (clickHigh.textContent||0)) clickHigh.textContent=clickScore;
+            if(clickScore>=clickLevel*10) clickLevel++;
+            document.getElementById("clickLevel").textContent=clickLevel;
+        }
+    },1000);
+}
+
+function addClick(){
+    if(clickTime>0){
+        clickScore++;
+        clickSound.play();
+        document.getElementById("clickScore").textContent=clickScore;
+    }
+}
+
+/* REACTION */
+let reactionStart, reactionLevel=1;
+function startReaction(){
+    const box=document.getElementById("reactionBox");
+    box.style.background="crimson";
+    box.textContent="Wachten...";
+    setTimeout(()=>{
+        box.style.background="limegreen";
+        box.textContent="KLIK!";
+        reactionStart=Date.now();
+    },Math.random()*(3000/reactionLevel)+500);
+    box.onclick=()=>{
+        if(box.style.background==="limegreen"){
+            const t=Date.now()-reactionStart;
+            successSound.play();
+            updateBoard("reactionBoard", t, document.getElementById("reactionBoard"));
+            if(t<600) reactionLevel++;
+            document.getElementById("reactionLevel").textContent=reactionLevel;
+            document.getElementById("reactionResult").textContent=t+" ms";
+        } else errorSound.play();
+    }
+}
+
+/* GUESS */
+let guessLevel=1, secret=Math.floor(Math.random()*10)+1, attempts=0;
+function checkGuess(){
+    const g=Number(document.getElementById("guessInput").value);
+    attempts++;
+    if(g===secret){
+        successSound.play();
+        updateBoard("guessBoard", attempts, document.getElementById("guessBoard"));
+        guessLevel++;
+        document.getElementById("guessLevel").textContent=guessLevel;
+        secret=Math.floor(Math.random()*(guessLevel*10))+1;
+        attempts=0;
+    } else {
+        errorSound.play();
+        document.getElementById("guessResult").textContent=g<secret?"Te laag":"Te hoog";
+    }
+}
+</script>
+
 </body>
 </html>
